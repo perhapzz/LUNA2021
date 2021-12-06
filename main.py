@@ -127,12 +127,15 @@ def classify(seriesuids):
         pin_memory=True)
 
     #     weight = torch.from_numpy(np.ones_like(y).float().cuda()
-    for i, (x, coord) in enumerate(data_loader):
+    for i, (x, coord, pbb) in enumerate(data_loader):
         coord = Variable(coord).cuda()
         x = Variable(x).cuda()
         crop, out = net(x,coord)
         np.save(f'{OUTPUT_PATH}/{testsplit[i]}/{testsplit[i]}_crop.npy', crop.cpu().numpy())
-        np.save(f'{OUTPUT_PATH}/{testsplit[i]}/{testsplit[i]}_out.npy', out.cpu().detach().numpy())
+        print('hhhh', pbb.shape, out.shape)
+        for idx in range(out.shape[1]):
+        	pbb[0, idx, 0] = out[0, idx]
+        np.save(f'{OUTPUT_PATH}/{testsplit[i]}/{testsplit[i]}_pbb.npy', pbb.cpu().detach().numpy())
 
 
 if __name__ == '__main__':

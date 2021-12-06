@@ -44,7 +44,7 @@ class DataBowl3Classifier(Dataset):
             pbb = np.load(os.path.join(bboxpath, '%s/%s_pbb.npy' %(idx, idx)))
             pbb = pbb[pbb[:,0] > config['conf_th']]
             pbb = nms(pbb, config['nms_th'])
-            np.save(os.path.join(bboxpath, '%s/%s_pbb.npy' %(idx, idx)), pbb)
+            # np.save(os.path.join(bboxpath, '%s/%s_pbb.npy' %(idx, idx)), pbb)
             pbb_label = []
             for p in pbb:
                 isnod = False
@@ -99,7 +99,7 @@ class DataBowl3Classifier(Dataset):
             y = np.array([self.yset[idx]])
             return torch.from_numpy(croplist).float(), torch.from_numpy(coordlist).float(), torch.from_numpy(isnodlist).int(), torch.from_numpy(y)
         else:
-            return torch.from_numpy(croplist).float(), torch.from_numpy(coordlist).float()
+            return torch.from_numpy(croplist).float(), torch.from_numpy(coordlist).float(), pbb
 
     def __len__(self):
         if self.phase != 'test':
