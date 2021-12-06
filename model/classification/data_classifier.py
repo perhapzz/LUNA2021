@@ -11,6 +11,9 @@ import warnings
 from scipy.ndimage.interpolation import rotate
 import pandas
 
+from configs import OUTPUT_PATH, RESOURCES_PATH
+
+
 class DataBowl3Classifier(Dataset):
     def __init__(self, split, config, phase = 'train'):
         assert(phase == 'train' or phase == 'val' or phase == 'test')
@@ -41,7 +44,7 @@ class DataBowl3Classifier(Dataset):
             pbb = np.load(os.path.join(bboxpath, '%s/%s_pbb.npy' %(idx, idx)))
             pbb = pbb[pbb[:,0] > config['conf_th']]
             pbb = nms(pbb, config['nms_th'])
-            
+            np.save(os.path.join(bboxpath, '%s/%s_pbb.npy' %(idx, idx)), pbb)
             pbb_label = []
             for p in pbb:
                 isnod = False
