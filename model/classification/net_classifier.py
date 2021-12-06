@@ -1,6 +1,6 @@
 import torch
 from torch import nn
-from layers import *
+from model.classification.layers import *
 from torch.nn import DataParallel
 from torch.backends import cudnn
 from torch.utils.data import DataLoader
@@ -11,12 +11,15 @@ from scipy.ndimage.interpolation import rotate
 import numpy as np
 import os
 
+from configs import OUTPUT_PATH, RESOURCES_PATH
+
+
 config = {}
-config['topk'] = 5
+config['topk'] = 20
 config['resample'] = None
-config['datadir'] = '/run/shm/preprocess_1_3/'
+config['datadir'] = './data/output/'
 config['preload_train'] = True
-config['bboxpath'] = '../cpliangming/results/res18_prep3/bbox/'
+config['bboxpath'] = './data/output/'
 config['labelfile'] = '../stage1_labels.csv'
 config['preload_val'] = True
 
@@ -30,7 +33,6 @@ config['isScale'] = True
 
 config['random_sample'] = True
 config['T'] = 1
-config['topk'] = 5
 config['stride'] = 4
 config['augtype'] = {'flip':True,'swap':False,'rotate':False,'scale':False}
 
@@ -151,23 +153,35 @@ class CaseNet(nn.Module):
     def forward(self,xlist,coordlist):
 #         xlist: n x k x 1x 96 x 96 x 96
 #         coordlist: n x k x 3 x 24 x 24 x 24
+        state = {'croplist': xlist, 'coordlist': coordlist}
+        # torch.save(state, f'{config['datadir']}/crop.ckpt')
         xsize = xlist.size()
         corrdsize = coordlist.size()
         xlist = xlist.view(-1,xsize[2],xsize[3],xsize[4],xsize[5])
         coordlist = coordlist.view(-1,corrdsize[2],corrdsize[3],corrdsize[4],corrdsize[5])
         
         noduleFeat,nodulePred = self.NoduleNet(xlist,coordlist)
-        nodulePred = nodulePred.contiguous().view(corrdsize[0],corrdsize[1],-1)
+        # print(noduleFeat)
         
+        nodulePred = nodulePred.contiguous().view(corrdsize[0],corrdsize[1],-1)
+        # print(f'noduleFeat = {noduleFeat}')
         featshape = noduleFeat.size()# n x k x 128 x 24 x 24 x24
-        centerFeat = self.pool(noduleFeat[:,:,featshape[2]/2-1:featshape[2]/2+1,
-                                          featshape[3]/2-1:featshape[3]/2+1,
-                                          featshape[4]/2-1:featshape[4]/2+1])
+        centerFeat = self.pool(noduleFeat[:,:,featshape[2]//2-1:featshape[2]//2+1,
+                                          featshape[3]//2-1:featshape[3]//2+1,
+                                          featshape[4]//2-1:featshape[4]//2+1])
         centerFeat = centerFeat[:,:,0,0,0]
         out = self.dropout(centerFeat)
         out = self.Relu(self.fc1(out))
         out = torch.sigmoid(self.fc2(out))
         out = out.view(xsize[0],xsize[1])
-        base_prob = torch.sigmoid(self.baseline)
-        casePred = 1-torch.prod(1-out,dim=1)*(1-base_prob.expand(out.size()[0]))
-        return nodulePred,casePred,out
+        # print(f'out = {out}')
+        # state = {'out': out}
+        # torch.save(state, 'out.ckpt')
+        # base_prob = torch.sigmoid(self.baseline)
+        # casePred = 1-torch.prod(1-out,dim=1)*(1-base_prob.expand(out.size()[0]))
+        # return nodulePred,casePred,out
+        return xlist, out
+
+def get_model():
+    net = CaseNet(topk=5)
+    return net, config

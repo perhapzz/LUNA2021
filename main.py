@@ -3,11 +3,18 @@ import time
 import torch
 import numpy as np
 from torch.autograd import Variable
+from torch.nn import DataParallel
+from torch.backends import cudnn
+from torch.utils.data import DataLoader
 
 from model.detection.split_combine import SplitComb
 from model.detection.layers import nms
 import model.detection.res18 as res18
 from preprocessing._classes import CTScan
+
+import model.classification.net_classifier as net_classifier
+from model.classification.data_classifier import DataBowl3Classifier
+
 from configs import OUTPUT_PATH, RESOURCES_PATH
 
 
@@ -99,12 +106,40 @@ def detecte(seriesuids):
 
 
 def classify(seriesuids):
-	pass
+    start_time = time.time()
+
+    net, config = net_classifier.get_model()
+    checkpoint = torch.load('./model/classification/classifier.ckpt', encoding= 'unicode_escape')
+    net.load_state_dict(checkpoint['state_dict'])
+    net = net.cuda()
+    net.eval()
+    cudnn.benchmark = True
+    net = DataParallel(net)
+
+    dirs = os.listdir(f'{OUTPUT_PATH}/')
+    testsplit = list(set(dirs).intersection(set(seriesuids)))
+    dataset = DataBowl3Classifier(testsplit, config, phase = 'test')
+    data_loader = DataLoader(
+        dataset,
+        batch_size = 1,
+        shuffle = False,
+        num_workers = 32,
+        pin_memory=True)
+
+    #     weight = torch.from_numpy(np.ones_like(y).float().cuda()
+    for i, (x, coord) in enumerate(data_loader):
+        coord = Variable(coord).cuda()
+        x = Variable(x).cuda()
+        crop, out = net(x,coord)
+        np.save(f'{OUTPUT_PATH}/{testsplit[i]}/{testsplit[i]}_crop.npy', crop.cpu().numpy())
+        np.save(f'{OUTPUT_PATH}/{testsplit[i]}/{testsplit[i]}_out.npy', out.cpu().detach().numpy())
 
 
 if __name__ == '__main__':
 	seriesuids = ['xuyi']
-	detecte(seriesuids)
+	[os.makedirs(f'{OUTPUT_PATH}/{d}', exist_ok=True) for d in seriesuids]
+
+	classify(seriesuids)
 
 
 

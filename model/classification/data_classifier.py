@@ -5,11 +5,10 @@ import os
 import time
 import collections
 import random
-from layers import iou
+from model.classification.layers import iou, nms
 from scipy.ndimage import zoom
 import warnings
 from scipy.ndimage.interpolation import rotate
-from layers import nms,iou
 import pandas
 
 class DataBowl3Classifier(Dataset):
@@ -33,28 +32,20 @@ class DataBowl3Classifier(Dataset):
         self.pbb_label = []
         
         idcs = split
-        self.filenames = [os.path.join(datadir, '%s_clean.npy' % idx.split('-')[0]) for idx in idcs]
+        self.filenames = [os.path.join(datadir, '%s/%s_clean.npy' %(idx, idx)) for idx in idcs]
         if self.phase!='test':
             self.yset = 1-np.array([f.split('-')[1][2] for f in idcs]).astype('int')
  
         
         for idx in idcs:
-            pbb = np.load(os.path.join(bboxpath,idx+'_pbb.npy'))
-            pbb = pbb[pbb[:,0]>config['conf_th']]
+            pbb = np.load(os.path.join(bboxpath, '%s/%s_pbb.npy' %(idx, idx)))
+            pbb = pbb[pbb[:,0] > config['conf_th']]
             pbb = nms(pbb, config['nms_th'])
             
-            lbb = np.load(os.path.join(bboxpath,idx+'_lbb.npy'))
             pbb_label = []
-            
             for p in pbb:
                 isnod = False
-                for l in lbb:
-                    score = iou(p[1:5], l)
-                    if score > config['detect_th']:
-                        isnod = True
-                        break
                 pbb_label.append(isnod)
-#             if idx.startswith()
             self.candidate_box.append(pbb)
             self.pbb_label.append(np.array(pbb_label))
         self.crop = simpleCrop(config,phase)
@@ -68,7 +59,8 @@ class DataBowl3Classifier(Dataset):
         pbb_label = self.pbb_label[idx]
         conf_list = pbb[:,0]
         T = self.T
-        topk = self.topk
+        # print(f'pbb.shape = {pbb.shape}; pbb.type = {type(pbb)}')
+        topk = pbb.shape[0]
         img = np.load(self.filenames[idx])
         if self.random_sample and self.phase=='train':
             chosenid = sample(conf_list,topk,T=T)
@@ -76,8 +68,8 @@ class DataBowl3Classifier(Dataset):
         else:
             chosenid = conf_list.argsort()[::-1][:topk]
         croplist = np.zeros([topk,1,self.crop_size[0],self.crop_size[1],self.crop_size[2]]).astype('float32')
-        coordlist = np.zeros([topk,3,self.crop_size[0]/self.stride,self.crop_size[1]/self.stride,self.crop_size[2]/self.stride]).astype('float32')
-        padmask = np.concatenate([np.ones(len(chosenid)),np.zeros(self.topk-len(chosenid))])
+        coordlist = np.zeros([topk,3,self.crop_size[0]//self.stride,self.crop_size[1]//self.stride,self.crop_size[2]//self.stride]).astype('float32')
+        padmask = np.concatenate([np.ones(len(chosenid)),np.zeros(topk-len(chosenid))])
         isnodlist = np.zeros([topk])
 
         
@@ -93,12 +85,19 @@ class DataBowl3Classifier(Dataset):
             croplist[i] = crop
             coordlist[i] = coord
             isnodlist[i] = isnod
-            
+
+        print(croplist.shape)
+        print(coordlist.shape)
+        
+        # state = {'croplist': croplist, 'coordlist': coordlist}
+        # torch.save(state, 'crop.ckpt')
+
         if self.phase!='test':
             y = np.array([self.yset[idx]])
             return torch.from_numpy(croplist).float(), torch.from_numpy(coordlist).float(), torch.from_numpy(isnodlist).int(), torch.from_numpy(y)
         else:
             return torch.from_numpy(croplist).float(), torch.from_numpy(coordlist).float()
+
     def __len__(self):
         if self.phase != 'test':
             return len(self.candidate_box)
@@ -151,9 +150,9 @@ class simpleCrop():
         
         normstart = np.array(start).astype('float32')/np.array(imgs.shape[1:])-0.5
         normsize = np.array(crop_size).astype('float32')/np.array(imgs.shape[1:])
-        xx,yy,zz = np.meshgrid(np.linspace(normstart[0],normstart[0]+normsize[0],self.crop_size[0]/self.stride),
-                           np.linspace(normstart[1],normstart[1]+normsize[1],self.crop_size[1]/self.stride),
-                           np.linspace(normstart[2],normstart[2]+normsize[2],self.crop_size[2]/self.stride),indexing ='ij')
+        xx,yy,zz = np.meshgrid(np.linspace(normstart[0],normstart[0]+normsize[0],self.crop_size[0]//self.stride),
+                           np.linspace(normstart[1],normstart[1]+normsize[1],self.crop_size[1]//self.stride),
+                           np.linspace(normstart[2],normstart[2]+normsize[2],self.crop_size[2]//self.stride),indexing ='ij')
         coord = np.concatenate([xx[np.newaxis,...], yy[np.newaxis,...],zz[np.newaxis,:]],0).astype('float32')
 
         if self.isScale:
