@@ -1,6 +1,8 @@
 import os
 import time
 import torch
+import numpy as np
+from torch.autograd import Variable
 
 from model.detection.split_combine import SplitComb
 from model.detection.layers import nms
@@ -20,12 +22,12 @@ def preprocess(seriesuids):
 
 
 def detecte(seriesuids):
-	start_time = time.time()
+    start_time = time.time()
 
-	config, net, loss, get_pbb = res18.get_model()
-	checkpoint = torch.load('./model/detection/res18fd9020.ckpt')
-	net.load_state_dict(checkpoint['state_dict'])
-	net = net.cuda()
+    config, net, loss, get_pbb = res18.get_model()
+    checkpoint = torch.load('./model/detection/res18fd9020.ckpt')
+    net.load_state_dict(checkpoint['state_dict'])
+    net = net.cuda()
     net.eval()
 
     # Split and Combine
@@ -36,11 +38,11 @@ def detecte(seriesuids):
 
     dirs = os.listdir(f'{OUTPUT_PATH}/')
     for seriesuid in list(set(dirs).intersection(set(seriesuids))):
-    	print(f'{seriesuid} is being detected...')
+        print(f'{seriesuid} is being detected...')
 
-    	# Load
-    	imgs = np.load(f'{OUTPUT_PATH}/{seriesuid}/{seriesuid}.npy')
-    	print(f'    INPUT imgs.shape = {imgs.shape}')
+        # Load
+        imgs = np.load(f'{OUTPUT_PATH}/{seriesuid}/{seriesuid}_clean.npy')
+        print(f'    INPUT imgs.shape = {imgs.shape}')
 
         # Pad
         nz, nh, nw = imgs.shape[1:]
