@@ -19,13 +19,16 @@ from configs import OUTPUT_PATH, RESOURCES_PATH
 
 
 def preprocess(seriesuids):
-	dirs = os.listdir(f'{RESOURCES_PATH}/')
-	for seriesuid in list(set(dirs).intersection(set(seriesuids))):
-		# print(seriesuid)
-		# CTScan
-		ct = CTScan(seriesuid = seriesuid)
-		ct.preprocess()
-		ct.save_preprocessed_image()
+    start_time = time.time()
+
+    dirs = os.listdir(f'{RESOURCES_PATH}/')
+    for seriesuid in list(set(dirs).intersection(set(seriesuids))):
+        print(f'{seriesuid} is loading...')
+        ct = CTScan(seriesuid = seriesuid)
+        ct.preprocess()
+        ct.save_preprocessed_image()
+    end_time = time.time()
+    print('    elapsed time is %3.2f seconds\n' % (end_time - start_time))
 
 
 def detecte(seriesuids):
@@ -102,7 +105,7 @@ def detecte(seriesuids):
         np.save(f'{OUTPUT_PATH}/{seriesuid}/{seriesuid}_pbb.npy', pbb)
 
     end_time = time.time()
-    print('    elapsed time is %3.2f seconds' % (end_time - start_time))
+    print('    elapsed time is %3.2f seconds\n' % (end_time - start_time))
 
 
 def classify(seriesuids):
@@ -128,20 +131,25 @@ def classify(seriesuids):
 
     #     weight = torch.from_numpy(np.ones_like(y).float().cuda()
     for i, (x, coord, pbb) in enumerate(data_loader):
+        print(f'{seriesuids[i]} is being classified...')
         coord = Variable(coord).cuda()
         x = Variable(x).cuda()
         crop, out = net(x,coord)
         np.save(f'{OUTPUT_PATH}/{testsplit[i]}/{testsplit[i]}_crop.npy', crop.cpu().numpy())
-        print('hhhh', pbb.shape, out.shape)
+        # print(pbb.shape, out.shape)
         for idx in range(out.shape[1]):
-        	pbb[0, idx, 0] = out[0, idx]
+            pbb[0, idx, 0] = out[0, idx]
+        pbb.sort()
         np.save(f'{OUTPUT_PATH}/{testsplit[i]}/{testsplit[i]}_pbb.npy', pbb.cpu().detach().numpy())
+    end_time = time.time()
+    print('    elapsed time is %3.2f seconds\n' % (end_time - start_time))
 
 
 if __name__ == '__main__':
-	seriesuids = ['xuyi']
+	seriesuids = ['chenpeiying1']
 	[os.makedirs(f'{OUTPUT_PATH}/{d}', exist_ok=True) for d in seriesuids]
-
+	preprocess(seriesuids)
+	detecte(seriesuids)
 	classify(seriesuids)
 
 
